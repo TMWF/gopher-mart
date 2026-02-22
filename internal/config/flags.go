@@ -4,15 +4,17 @@ import (
 	"flag"
 	"log/slog"
 
+	"github.com/TMWF/gopher-mart/internal/config/db"
 	myLoggerPackage "github.com/TMWF/gopher-mart/internal/logger"
 	"github.com/caarlos0/env/v6"
 )
 
 type Config struct {
-	RunAddress string `env:"RUN_ADDRESS"`
+	RunAddress           string `env:"RUN_ADDRESS"`
+	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
 	// BaseURL        string `env:"BASE_URL"`
 	// LogLevel       string `env:"LOG_LEVEL"`
-	// db.PostgreSQLConfig
+	db.PostgreSQLConfig
 	// UserJWTConfig
 }
 
@@ -21,18 +23,20 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 
 	cfg := &Config{}
 	var serverHostFlag string
+	var accrualSystemAddress string
 	// var baseURLFlag string
 	// var logLevel string
 	// var urlStoragePath string
-	// var databaseDSN string
+	var databaseDSN string
 	// var tokenExp int
 	// var secretKey string
 
 	flag.StringVar(&serverHostFlag, "a", "localhost:8080", "address and port to run server")
+	flag.StringVar(&serverHostFlag, "r", "", "accrual system address")
 	// flag.StringVar(&baseURLFlag, "b", "http://localhost:8080", "address and port to run server")
 	// flag.StringVar(&logLevel, "c", "DEBUG", "logging level")
 	// flag.StringVar(&urlStoragePath, "f", "", "File storage path for urls")
-	// flag.StringVar(&databaseDSN, "d", "", "PostgreSQL DSN")
+	flag.StringVar(&databaseDSN, "d", "", "PostgreSQL DSN")
 	// flag.IntVar(&tokenExp, "t", 3, "Token expiration in hours")
 	// flag.StringVar(&secretKey, "s", "supersecretkey", "JWT secret key")
 	// flag.Parse()
@@ -44,6 +48,10 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 
 	if cfg.RunAddress == "" {
 		cfg.RunAddress = serverHostFlag
+	}
+
+	if cfg.AccrualSystemAddress == "" {
+		cfg.RunAddress = accrualSystemAddress
 	}
 
 	// if cfg.BaseURL == "" {
@@ -58,10 +66,10 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 	// 	cfg.URLStoragePath = urlStoragePath
 	// }
 
-	// if cfg.DatabaseDSN == "" {
-	// 	logger.GetLogger().Debug("Setting database config")
-	// 	cfg.DatabaseDSN = databaseDSN
-	// }
+	if cfg.DatabaseDSN == "" {
+		log.Debug("Setting database config")
+		cfg.DatabaseDSN = databaseDSN
+	}
 
 	// if cfg.SecretKey == "" {
 	// 	cfg.SecretKey = secretKey
