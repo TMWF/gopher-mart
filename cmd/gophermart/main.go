@@ -6,8 +6,10 @@ import (
 	"os"
 
 	"github.com/TMWF/gopher-mart/internal/config"
+	"github.com/TMWF/gopher-mart/internal/handler"
 	"github.com/TMWF/gopher-mart/internal/logger"
 	"github.com/TMWF/gopher-mart/internal/middleware"
+	"github.com/TMWF/gopher-mart/internal/service"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 )
@@ -34,13 +36,27 @@ func run() {
 
 // TODO: добавить к параметрам метода БД
 func createRouter(cfg *config.Config, logger *slog.Logger) http.Handler {
-	// userService := service.NewUserService(logger)
+	userService := service.NewUserService(logger)
+	userHandler := handler.NewUserHandler(userService, logger)
+
+	balanceService := service.NewBalanceService(logger)
+	balanceHandler := handler.NewBalanceHandler(logger, balanceService)
+
+	ordersService := service.NewOrdersService(logger)
+	ordersHandler := handler.NewOrdersHandler(logger, ordersService)
 
 	router := chi.NewRouter()
 
 	router.Use(chiMiddleware.RequestID)
 	router.Use(chiMiddleware.Recoverer)
 	router.Use(middleware.New(logger))
-
+	// TODO: добавить логгер к гзип
+	// router.Use(middleware.GzipMiddleware())
+	router.Post(`/api/user/register`, userHandler.RegisterUser)
+	router.Post(`/api/user/login`, userHandler.LoginUser)
+	router.Get(`/api/user/balance`, balanceHandler.GetBalanceForUser)
+	router.Post(`/api/user/balance/withdraw`, balanceHandler.WithdrawForOrder)
+	router.Post(`/api/user/orders`, ordersHandler.UploadOrder)
+	router.Get(`/api/user/orders`, ordersHandler.GetUserOrders)
 	return router
 }
