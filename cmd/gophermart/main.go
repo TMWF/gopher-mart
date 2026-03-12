@@ -49,9 +49,9 @@ func createRouter(cfg *config.Config, logger *slog.Logger) http.Handler {
 
 	router.Use(chiMiddleware.RequestID)
 	router.Use(chiMiddleware.Recoverer)
-	router.Use(middleware.New(logger))
-	// TODO: добавить логгер к гзип
-	// router.Use(middleware.GzipMiddleware())
+	router.Use(middleware.NewRequestLogger(logger))
+	router.Use(middleware.GzipMiddleware())
+	router.Use(middleware.JwtTokenMiddleware(cfg, logger))
 	router.Post(`/api/user/register`, userHandler.RegisterUser)
 	router.Post(`/api/user/login`, userHandler.LoginUser)
 	router.Get(`/api/user/balance`, balanceHandler.GetBalanceForUser)

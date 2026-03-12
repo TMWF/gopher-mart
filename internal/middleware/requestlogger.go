@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func New(log *slog.Logger) func(next http.Handler) http.Handler {
+func NewRequestLogger(log *slog.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		log := log.With(
 			slog.String("component", "middleware/requestlogger"),

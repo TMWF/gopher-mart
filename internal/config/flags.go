@@ -12,6 +12,7 @@ import (
 type Config struct {
 	RunAddress           string `env:"RUN_ADDRESS"`
 	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
+	SecretKey            string `env:"SECRET_KEY"`
 	// BaseURL        string `env:"BASE_URL"`
 	// LogLevel       string `env:"LOG_LEVEL"`
 	db.PostgreSQLConfig
@@ -29,7 +30,7 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 	// var urlStoragePath string
 	var databaseDSN string
 	// var tokenExp int
-	// var secretKey string
+	var secretKey string
 
 	flag.StringVar(&serverHostFlag, "a", "localhost:8080", "address and port to run server")
 	flag.StringVar(&serverHostFlag, "r", "", "accrual system address")
@@ -38,7 +39,7 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 	// flag.StringVar(&urlStoragePath, "f", "", "File storage path for urls")
 	flag.StringVar(&databaseDSN, "d", "", "PostgreSQL DSN")
 	// flag.IntVar(&tokenExp, "t", 3, "Token expiration in hours")
-	// flag.StringVar(&secretKey, "s", "supersecretkey", "JWT secret key")
+	flag.StringVar(&secretKey, "s", "supersecretkey", "JWT secret key")
 	// flag.Parse()
 
 	err := env.Parse(cfg)
@@ -71,9 +72,9 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 		cfg.DatabaseDSN = databaseDSN
 	}
 
-	// if cfg.SecretKey == "" {
-	// 	cfg.SecretKey = secretKey
-	// }
+	if cfg.SecretKey == "" {
+		cfg.SecretKey = secretKey
+	}
 
 	// cfg.TokenExp = 3 * time.Hour
 
