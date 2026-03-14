@@ -13,6 +13,7 @@ import (
 )
 
 var ErrUserNotAuthenticated = errors.New("user not authenticated")
+var ErrNotFoundUserWithDrawals = errors.New("not found user withdrawals")
 
 // BalanceService defines the interface for service layer of balancehandler.
 // Implementations are responsible for processing requests from balancehandler.
@@ -27,7 +28,33 @@ type BalanceService interface {
 	//   - model.GetBalanceResponseModel, containing current user balance and sum of withdrawals for user.
 	//   - error, if user is not authenticated or any error occured while retrieving data from database
 	GetBalanceForUser(context.Context) (*model.GetBalanceResponseModel, error)
+	// WithdrawForUserOrder processes POST-request from balancehandler for withdrawing bonuses from user's balance
+	// The method also checks user authentication and returns ErrUserNotAuthenticated, if user is not authorized
+	//
+	// Parameters:
+	//   - ctx: context.Context used in sql-queries.
+	//   - req: request model, passed down from balancehandler method
+	//
+	// Returns:
+	//   - error, if user is not authenticated or any error occured while retrieving data from database
 	WithdrawForUserOrder(ctx context.Context, req *model.WithDrawBalanceRequestModel) error
+	// GetUserWithdrawals retrieves the withdrawal history for the authenticated user.
+	// It extracts the user ID from the context, sets a timeout for the database operation,
+	// and calls the repository to fetch withdrawal records.
+	//
+	// It returns a slice of GetUserWithdrawalsResponseModel if withdrawals are found,
+	// or an error in the following cases:
+	// - ErrUserNotAuthenticated: If the user ID is not found in the context.
+	// - ErrNotFoundUserWithDrawals: If the user has no withdrawal records.
+	// - Any other error returned by the repository layer during the database operation.
+	//
+	// Context:
+	// The provided context is used for cancellation and with a timeout of 5 seconds for the repository call.
+	// The UserID is expected to be stored in the context under the util.UserID key.
+	//
+	// Logging:
+	// The method logs warnings for missing user ID in context and for cases where no withdrawals are found for a user.
+	GetUserWithdrawals(ctx context.Context) ([]model.GetUserWithdrawalsResponseModel, error)
 }
 
 type balanceService struct {
@@ -101,4 +128,45 @@ func (bs *balanceService) WithdrawForUserOrder(ctx context.Context, req *model.W
 	context, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	return bs.repository.WithdrawForUserOrder(context, userID, req)
+}
+
+// Implementation of GetUserWithdrawals method of BalanceService method.
+// GetUserWithdrawals retrieves the withdrawal history for the authenticated user.
+// It extracts the user ID from the context, sets a timeout for the database operation,
+// and calls the repository to fetch withdrawal records.
+//
+// It returns a slice of GetUserWithdrawalsResponseModel if withdrawals are found,
+// or an error in the following cases:
+// - ErrUserNotAuthenticated: If the user ID is not found in the context.
+// - ErrNotFoundUserWithDrawals: If the user has no withdrawal records.
+// - Any other error returned by the repository layer during the database operation.
+//
+// Context:
+// The provided context is used for cancellation and with a timeout of 5 seconds for the repository call.
+// The UserID is expected to be stored in the context under the util.UserID key.
+//
+// Logging:
+// The method logs warnings for missing user ID in context and for cases where no withdrawals are found for a user.
+func (bs *balanceService) GetUserWithdrawals(ctx context.Context) ([]model.GetUserWithdrawalsResponseModel, error) {
+	log := bs.logger.With(slog.String("op", "GetUserWithdrawals"))
+	userID, ok := ctx.Value(util.UserID).(uuid.UUID)
+	if !ok {
+		log.Warn("User id not found in context")
+		return nil, ErrUserNotAuthenticated
+	}
+
+	context, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	response, err := bs.repository.GetUserWithdrawals(context, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(response) == 0 {
+		log.Warn("Not found withdrawals for user", slog.String("userID", userID.String()))
+		return nil, ErrNotFoundUserWithDrawals
+	}
+
+	return response, nil
 }

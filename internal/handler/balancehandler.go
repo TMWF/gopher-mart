@@ -122,11 +122,64 @@ func (bh *balanceHandler) WithdrawForOrder(w http.ResponseWriter, req *http.Requ
 		http.Error(w, "Error occured while trying to withdraw bonuses for order", http.StatusInternalServerError)
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
+// GetUserWithdrawals handles GET requests to retrieve a user's withdrawal history.
+// It expects a GET request and retrieves withdrawal information from the service layer.
+//
+// Supported Responses:
+// - http.StatusOK (200 OK): If withdrawals are successfully retrieved and returned as JSON.
+// - http.StatusMethodNotAllowed (405 Method Not Allowed): If the request method is not GET.
+// - http.StatusUnauthorized (401 Unauthorized): If the user is not authenticated.
+// - http.StatusNoContent (204 No Content): If the user is authenticated but has no withdrawals.
+// - http.StatusInternalServerError (500 Internal Server Error): If any other error occurs during processing.
+//
+// Context:
+// The request context is used to propagate cancellation signals and deadlines.
+//
+// Logging:
+// The function uses a logger to record operations and errors, including:
+// - The operation being performed ("op": "GetUserWithdrawals").
+// - Authentication errors.
+// - Errors related to user withdrawals not being found.
+// - Generic errors during the retrieval process.
 func (bh *balanceHandler) GetUserWithdrawals(w http.ResponseWriter, req *http.Request) {
+	log := bh.logger.With(slog.String("op", "GetUserWithdrawals"))
+
 	if req.Method != http.MethodGet {
 		http.Error(w, "Incorrect HTTP method, only POST methods allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	response, err := bh.service.GetUserWithdrawals(req.Context())
+	if errors.Is(err, service.ErrUserNotAuthenticated) {
+		log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	if errors.Is(err, service.ErrNotFoundUserWithDrawals) {
+		http.Error(w, err.Error(), http.StatusNoContent)
+		return
+	}
+
+	if err != nil {
+		log.Error("Error occured while getting user withdrawals", logger.Err(err))
+		http.Error(w, "Error occured while getting user withdrawals", http.StatusInternalServerError)
+		return
+	}
+
+	responseBody, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(responseBody)))
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(responseBody)
 }
