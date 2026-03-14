@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/TMWF/gopher-mart/internal/logger"
 	"github.com/TMWF/gopher-mart/internal/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -130,6 +131,7 @@ func (br *balanceRepository) GetBalanceForUser(ctx context.Context, userID uuid.
 // - ErrIncorrectUserOrder - if there is no order with passed order id forr user
 // - any other error if occured any while retrieving data from database
 func (br *balanceRepository) WithdrawForUserOrder(ctx context.Context, userId uuid.UUID, req *model.WithDrawBalanceRequestModel) error {
+	log := br.logger.With(slog.String("op", "WithdrawForUserOrder"))
 	var userBalance float64
 
 	selectUserBalanceQuery := `SELECT b.current_balance FROM balances as b
@@ -140,7 +142,16 @@ func (br *balanceRepository) WithdrawForUserOrder(ctx context.Context, userId uu
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil {
+			log.Error(
+				"Failed to properly close transaction",
+				logger.Err(err),
+			)
+		}
+		log.Debug("Successfully closed transaction")
+	}()
 
 	err = tx.QueryRow(ctx, selectUserBalanceQuery, userId).Scan(&userBalance)
 	if err != nil {
@@ -219,6 +230,7 @@ func (br *balanceRepository) GetUserWithdrawals(ctx context.Context, userID uuid
 	if err != nil {
 		return nil, err
 	}
+
 	defer rows.Close()
 
 	result := make([]model.GetUserWithdrawalsResponseModel, 0)
