@@ -27,6 +27,7 @@ type BalanceService interface {
 	//   - model.GetBalanceResponseModel, containing current user balance and sum of withdrawals for user.
 	//   - error, if user is not authenticated or any error occured while retrieving data from database
 	GetBalanceForUser(context.Context) (*model.GetBalanceResponseModel, error)
+	WithdrawForUserOrder(ctx context.Context, req *model.WithDrawBalanceRequestModel) error
 }
 
 type balanceService struct {
@@ -77,4 +78,27 @@ func (bs *balanceService) GetBalanceForUser(ctx context.Context) (*model.GetBala
 	}
 
 	return response, nil
+}
+
+// Implementation of WithdrawForUserOrder method of BalanceService interface
+// WithdrawForUserOrder processes POST-request from balancehandler for withdrawing bonuses from user's balance
+// The method also checks user authentication and returns ErrUserNotAuthenticated, if user is not authorized
+//
+// Parameters:
+//   - ctx: context.Context used in sql-queries.
+//   - req: request model, passed down from balancehandler method
+//
+// Returns:
+//   - error, if user is not authenticated or any error occured while retrieving data from database
+func (bs *balanceService) WithdrawForUserOrder(ctx context.Context, req *model.WithDrawBalanceRequestModel) error {
+	log := bs.logger.With(slog.String("op", "WithdrawForUserOrder"))
+	userID, ok := ctx.Value(util.UserID).(uuid.UUID)
+	if !ok {
+		log.Warn("User id not found in context")
+		return ErrUserNotAuthenticated
+	}
+
+	context, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return bs.repository.WithdrawForUserOrder(context, userID, req)
 }

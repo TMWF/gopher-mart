@@ -35,6 +35,8 @@ func run() {
 		return
 	}
 
+	defer pgxpool.Close()
+
 	log.Info("starting application", slog.String("env", env))
 	router := createRouter(cfg, log, pgxpool)
 	log.Info("startingServer", slog.String("address", cfg.RunAddress))
