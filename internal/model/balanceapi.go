@@ -8,8 +8,8 @@ type GetBalanceResponseModel struct {
 }
 
 type WithDrawBalanceRequestModel struct {
-	Order string  `json:"order"`
-	Sum   float64 `json:"sum"`
+	Order string  `json:"order" validate:"required,min=1,numeric,luhn"`
+	Sum   float64 `json:"sum" validate:"required,min=1"`
 }
 
 type GetUserWithdrawalsResponseModel struct {

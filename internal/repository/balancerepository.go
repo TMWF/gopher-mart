@@ -12,9 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var ErrBalanceNotEnough = errors.New("not enough bonuses on user balance")
-var ErrIncorrectUserOrder = errors.New("incorrect user order")
-
 // BalanceRepository defines the interface for managing user balance.
 // Implementations are responsible for storing and retrieving balance records.
 type BalanceRepository interface {

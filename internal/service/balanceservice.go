@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"time"
 
@@ -11,9 +10,6 @@ import (
 	"github.com/TMWF/gopher-mart/internal/util"
 	"github.com/google/uuid"
 )
-
-var ErrUserNotAuthenticated = errors.New("user not authenticated")
-var ErrNotFoundUserWithDrawals = errors.New("not found user withdrawals")
 
 // BalanceService defines the interface for service layer of balancehandler.
 // Implementations are responsible for processing requests from balancehandler.

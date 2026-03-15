@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS orders (
     user_id     UUID            NOT NULL,
     created_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    deleted_at  TIMESTAMPTZ     DEFAULT NOW(),
+    deleted_at  TIMESTAMPTZ,
 
     CONSTRAINT chk_status_valid 
     CHECK (status IN ('NEW','PROCESSING','INVALID','PROCESSED')),
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS orders (
         ON DELETE RESTRICT
 );
 
-CREATE INDEX idx_orders_user_id ON orders (user_id);
+CREATE INDEX idx_orders_user_id_order_id ON orders (order_id, user_id);
 
 -- TODO: DELETE
 -- CREATE INDEX idx_users_active

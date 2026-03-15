@@ -11,17 +11,21 @@ import (
 	"github.com/TMWF/gopher-mart/internal/model"
 	"github.com/TMWF/gopher-mart/internal/repository"
 	"github.com/TMWF/gopher-mart/internal/service"
+	"github.com/TMWF/gopher-mart/internal/util/validation"
+	"github.com/go-playground/validator"
 )
 
 type balanceHandler struct {
-	logger  *slog.Logger
-	service service.BalanceService
+	logger    *slog.Logger
+	service   service.BalanceService
+	validator *validator.Validate
 }
 
-func NewBalanceHandler(logger *slog.Logger, service service.BalanceService) *balanceHandler {
+func NewBalanceHandler(logger *slog.Logger, service service.BalanceService, v *validator.Validate) *balanceHandler {
 	return &balanceHandler{
-		logger:  logger.With(slog.String("op", "handler.BalanceHandler")),
-		service: service,
+		logger:    logger.With(slog.String("op", "handler.BalanceHandler")),
+		service:   service,
+		validator: v,
 	}
 }
 
@@ -92,6 +96,11 @@ func (bh *balanceHandler) WithdrawForOrder(w http.ResponseWriter, req *http.Requ
 	if err := dec.Decode(&reqBody); err != nil {
 		log.Error("Error occured while decoding request body", logger.Err(err))
 		http.Error(w, "Error occured while decoding request body", http.StatusBadRequest)
+		return
+	}
+
+	if !validation.IsValidRequest(reqBody, bh.validator, log) {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 

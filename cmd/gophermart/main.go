@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -9,12 +10,14 @@ import (
 	"github.com/TMWF/gopher-mart/internal/config"
 	"github.com/TMWF/gopher-mart/internal/database"
 	"github.com/TMWF/gopher-mart/internal/handler"
-	"github.com/TMWF/gopher-mart/internal/logger"
+	mylogger "github.com/TMWF/gopher-mart/internal/logger"
 	"github.com/TMWF/gopher-mart/internal/middleware"
 	"github.com/TMWF/gopher-mart/internal/repository"
 	"github.com/TMWF/gopher-mart/internal/service"
+	"github.com/TMWF/gopher-mart/internal/util/validation"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-playground/validator"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -27,35 +30,45 @@ func run() {
 	if env == "" {
 		env = "local"
 	}
-	log := logger.SetupLogger(env)
-	cfg := config.InitialiseConfigs(log)
+	logger := mylogger.SetupLogger(env)
+	cfg := config.InitialiseConfigs(logger)
 	pgxpool, err := database.NewPostgresPool(context.Background(), cfg.DatabaseDSN)
 	if err != nil {
-		log.Error("failed to initialise pgxpool server", logger.Err(err))
+		logger.Error("failed to initialise pgxpool server", mylogger.Err(err))
 		return
 	}
 
 	defer pgxpool.Close()
 
-	log.Info("starting application", slog.String("env", env))
-	router := createRouter(cfg, log, pgxpool)
-	log.Info("startingServer", slog.String("address", cfg.RunAddress))
+	logger.Info("starting application", slog.String("env", env))
+	router := createRouter(cfg, logger, pgxpool)
+	logger.Info("startingServer", slog.String("address", cfg.RunAddress))
 	if err := http.ListenAndServe(cfg.RunAddress, router); err != nil {
-		log.Error("failed to start server", logger.Err(err))
+		log.Fatal("failed to start server", err)
 	}
 }
 
 // TODO: добавить к параметрам метода БД
 func createRouter(cfg *config.Config, logger *slog.Logger, pgxpool *pgxpool.Pool) http.Handler {
+	v := validator.New()
+	err := v.RegisterValidation("luhn", func(fl validator.FieldLevel) bool {
+		value := fl.Field().String()
+		return validation.IsLuhnValid(value)
+	})
+
+	if err != nil {
+		log.Fatal("Error ocured while tryiong to register validator")
+	}
 
 	userService := service.NewUserService(logger)
 	userHandler := handler.NewUserHandler(userService, logger)
 
 	balanceRepository := repository.NewBalanceRepository(logger, pgxpool)
 	balanceService := service.NewBalanceService(logger, balanceRepository)
-	balanceHandler := handler.NewBalanceHandler(logger, balanceService)
+	balanceHandler := handler.NewBalanceHandler(logger, balanceService, v)
 
-	ordersService := service.NewOrdersService(logger)
+	ordersRepository := repository.NewOrdersRepository(pgxpool, logger)
+	ordersService := service.NewOrdersService(logger, ordersRepository)
 	ordersHandler := handler.NewOrdersHandler(logger, ordersService)
 
 	router := chi.NewRouter()

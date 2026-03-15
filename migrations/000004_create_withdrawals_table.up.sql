@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS withdrawals (
     order_id              UUID            NOT NULL,
     created_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    deleted_at            TIMESTAMPTZ     DEFAULT NOW(),
+    deleted_at            TIMESTAMPTZ,
 
     CONSTRAINT fk_order
     FOREIGN KEY (order_id)
