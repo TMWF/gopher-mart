@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/TMWF/gopher-mart/internal/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -30,6 +31,20 @@ type OrdersRepository interface {
 	//   - ErrOrderAlreadyUploadedByAnotherUser: If the order already exists but is owned by a different user.
 	//   - error: A wrapped database error if the query execution or scanning fails.
 	SaveOrder(ctx context.Context, userID uuid.UUID, order string) error
+	// GetUserOrders retrieves the complete history of orders for a specific user.
+	//
+	// The method queries the database for order details including ID, status,
+	// accrual amount, and creation timestamp. Results are sorted in descending
+	// order by 'created_at', ensuring the most recent orders appear first.
+	//
+	// Parameters:
+	//   - ctx: Database context for cancellation and timeouts.
+	//   - userID: The unique identifier (UUID) of the user.
+	//
+	// Returns:
+	//   - []model.GetUserOrdersResponseModel: A list of orders (empty slice if none found).
+	//   - error: Database execution errors or row scanning failures.
+	GetUserOrders(ctx context.Context, userID uuid.UUID) ([]model.GetUserOrdersResponseModel, error)
 }
 
 type ordersRepository struct {
@@ -106,4 +121,53 @@ func (or *ordersRepository) SaveOrder(ctx context.Context, userID uuid.UUID, ord
 	}
 
 	return ErrOrderAlreadyUploadedByAnotherUser
+}
+
+// Implementation of GetUserOrders method of OrdersRepository interface.
+//
+// GetUserOrders retrieves the complete history of orders for a specific user.
+//
+// The method queries the database for order details including ID, status,
+// accrual amount, and creation timestamp. Results are sorted in descending
+// order by 'created_at', ensuring the most recent orders appear first.
+//
+// Parameters:
+//   - ctx: Database context for cancellation and timeouts.
+//   - userID: The unique identifier (UUID) of the user.
+//
+// Returns:
+//   - []model.GetUserOrdersResponseModel: A list of orders (empty slice if none found).
+//   - error: Database execution errors or row scanning failures.
+func (or *ordersRepository) GetUserOrders(ctx context.Context, userID uuid.UUID) ([]model.GetUserOrdersResponseModel, error) {
+	query := `SELECT o.order_id, o.status, o.accrual, o.created_at 
+	FROM orders as o
+	JOIN users as u ON u.id = o.user_id
+	WHERE u.id = $1
+	ORDER BY o.created_at DESC`
+
+	rows, err := or.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	result := make([]model.GetUserOrdersResponseModel, 0)
+
+	for rows.Next() {
+		var responseModel model.GetUserOrdersResponseModel
+
+		err := rows.Scan(&responseModel.Number, &responseModel.Status, &responseModel.Accrual, &responseModel.UploadedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, responseModel)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/TMWF/gopher-mart/internal/model"
 	"github.com/TMWF/gopher-mart/internal/repository"
 	"github.com/TMWF/gopher-mart/internal/util"
 	"github.com/google/uuid"
@@ -27,6 +28,24 @@ type OrdersService interface {
 	//   - repository.ErrOrderAlreadyUploadedByAnotherUser: If the order is already assigned to someone else.
 	//   - error: Any other internal error from the repository or context.
 	SaveOrderForUser(ctx context.Context, order string) error
+	// GetUserOrders orchestrates the retrieval of orders for the currently authenticated user.
+	//
+	// The method follows these steps:
+	//  1. Extracts the user's UUID from the provided context using the util.UserID key.
+	//  2. Enforces a 5-second processing timeout for the downstream repository call.
+	//  3. Fetches the order list from the repository.
+	//  4. Validates the result set: if no orders are found, it returns a specific
+	//     ErrNotFoundUserOrders error to allow the caller to handle empty states (e.g., 204 No Content).
+	//
+	// Parameters:
+	//   - ctx: The request context, which must contain a valid userID.
+	//
+	// Returns:
+	//   - []model.GetUserOrdersResponseModel: A slice of order data models if found.
+	//   - ErrUserNotAuthenticated: If the userID is missing or invalid in the context.
+	//   - ErrNotFoundUserOrders: If the repository returns an empty list.
+	//   - error: Any other internal error from the repository layer.
+	GetUserOrders(ctx context.Context) ([]model.GetUserOrdersResponseModel, error)
 }
 
 type ordersService struct {
@@ -84,4 +103,47 @@ func (os *ordersService) SaveOrderForUser(ctx context.Context, order string) err
 	}
 
 	return nil
+}
+
+// Implementation of GetUserOrders of OrdersService interface.
+//
+// GetUserOrders orchestrates the retrieval of orders for the currently authenticated user.
+//
+// The method follows these steps:
+//  1. Extracts the user's UUID from the provided context using the util.UserID key.
+//  2. Enforces a 5-second processing timeout for the downstream repository call.
+//  3. Fetches the order list from the repository.
+//  4. Validates the result set: if no orders are found, it returns a specific
+//     ErrNotFoundUserOrders error to allow the caller to handle empty states (e.g., 204 No Content).
+//
+// Parameters:
+//   - ctx: The request context, which must contain a valid userID.
+//
+// Returns:
+//   - []model.GetUserOrdersResponseModel: A slice of order data models if found.
+//   - ErrUserNotAuthenticated: If the userID is missing or invalid in the context.
+//   - ErrNotFoundUserOrders: If the repository returns an empty list.
+//   - error: Any other internal error from the repository layer.
+func (os *ordersService) GetUserOrders(ctx context.Context) ([]model.GetUserOrdersResponseModel, error) {
+	log := os.logger.With(slog.String("op", "GetUserOrders"))
+	userID, ok := ctx.Value(util.UserID).(uuid.UUID)
+	if !ok {
+		log.Warn("User id not found in context")
+		return nil, ErrUserNotAuthenticated
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	result, err := os.repository.GetUserOrders(timeoutCtx, userID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result) == 0 {
+		return nil, ErrNotFoundUserOrders
+	}
+
+	return result, nil
 }

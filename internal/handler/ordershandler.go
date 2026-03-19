@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/TMWF/gopher-mart/internal/repository"
 	"github.com/TMWF/gopher-mart/internal/service"
@@ -86,10 +88,59 @@ func (oh *ordersHandler) UploadOrder(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// GetUserOrders handles the retrieval of all orders associated with the authenticated user.
+//
+// The method expects a GET request and fetches the list of orders from the service layer.
+// Results are returned as a JSON-encoded array in the response body. If the user has
+// no orders, the server responds with a 204 No Content status.
+//
+// Logic flows:
+//  1. Verifies that the HTTP method is GET.
+//  2. Calls the service layer to fetch orders for the user identified in the context.
+//  3. Handles authentication errors (401) and empty result cases (204).
+//  4. Marshals the list of orders into JSON and sets appropriate response headers.
+//
+// HTTP Response Codes:
+//   - 200 OK: Successfully retrieved the list of orders (returned as JSON).
+//   - 204 No Content: The user has no orders registered in the system.
+//   - 401 Unauthorized: User identity could not be verified from the context.
+//   - 405 Method Not Allowed: The request method is not GET.
+//   - 500 Internal Server Error: Unexpected failure during data retrieval or JSON serialization.
 func (oh *ordersHandler) GetUserOrders(w http.ResponseWriter, req *http.Request) {
-	// log := oh.logger.With(slog.String("op", "UploadOrder"))
-	if req.Method != http.MethodPost {
-		http.Error(w, "Incorrect HTTP method, only POST methods allowed", http.StatusMethodNotAllowed)
+	log := oh.logger.With(slog.String("op", "GetUserOrders"))
+	if req.Method != http.MethodGet {
+		http.Error(w, "Incorrect HTTP method, only GET methods allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	result, err := oh.service.GetUserOrders(req.Context())
+
+	if errors.Is(err, service.ErrUserNotAuthenticated) {
+		log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	if errors.Is(err, service.ErrNotFoundUserOrders) {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	if err != nil {
+		log.Error(err.Error())
+		http.Error(w, "Unexpected error occured while trying to get user orders", http.StatusInternalServerError)
+		return
+	}
+
+	responseBody, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", strconv.Itoa(len(responseBody)))
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(responseBody)
 }
