@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"log/slog"
+	"time"
 
 	"github.com/TMWF/gopher-mart/internal/config/db"
 	myLoggerPackage "github.com/TMWF/gopher-mart/internal/logger"
@@ -13,10 +14,10 @@ type Config struct {
 	RunAddress           string `env:"RUN_ADDRESS"`
 	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
 	SecretKey            string `env:"SECRET_KEY"`
+	TokenExp             time.Duration
 	// BaseURL        string `env:"BASE_URL"`
 	// LogLevel       string `env:"LOG_LEVEL"`
 	db.PostgreSQLConfig
-	// UserJWTConfig
 }
 
 func InitialiseConfigs(logger *slog.Logger) *Config {
@@ -29,7 +30,7 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 	// var logLevel string
 	// var urlStoragePath string
 	var databaseDSN string
-	// var tokenExp int
+	var tokenExp int
 	var secretKey string
 
 	flag.StringVar(&serverHostFlag, "a", "localhost:8080", "address and port to run server")
@@ -38,9 +39,9 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 	// flag.StringVar(&logLevel, "c", "DEBUG", "logging level")
 	// flag.StringVar(&urlStoragePath, "f", "", "File storage path for urls")
 	flag.StringVar(&databaseDSN, "d", "", "PostgreSQL DSN")
-	// flag.IntVar(&tokenExp, "t", 3, "Token expiration in hours")
+	flag.IntVar(&tokenExp, "t", 3, "Token expiration in hours")
 	flag.StringVar(&secretKey, "s", "supersecretkey", "JWT secret key")
-	// flag.Parse()
+	flag.Parse()
 
 	err := env.Parse(cfg)
 	if err != nil {
@@ -63,10 +64,6 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 	// 	cfg.LogLevel = logLevel
 	// }
 
-	// if cfg.URLStoragePath == "" {
-	// 	cfg.URLStoragePath = urlStoragePath
-	// }
-
 	if cfg.DatabaseDSN == "" {
 		log.Debug("Setting database config")
 		cfg.DatabaseDSN = databaseDSN
@@ -76,7 +73,7 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 		cfg.SecretKey = secretKey
 	}
 
-	// cfg.TokenExp = 3 * time.Hour
+	cfg.TokenExp = time.Duration(tokenExp) * time.Hour
 
 	return cfg
 }

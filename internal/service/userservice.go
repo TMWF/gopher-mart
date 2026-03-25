@@ -2,36 +2,107 @@ package service
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
+	"time"
+
+	"github.com/TMWF/gopher-mart/internal/model"
+	"github.com/TMWF/gopher-mart/internal/repository"
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService interface {
+	// CreateUser handles the business logic for registering a new user.
+	//
+	// The process involves:
+	//  1. Hashing the plain-text password using the bcrypt algorithm with DefaultCost.
+	//  2. Setting a 5-second execution timeout for the database operation.
+	//  3. Attempting to persist the user via the repository layer.
+	//  4. Mapping repository-specific errors (like ErrUserAlreadyExists) into
+	//     service-level domain errors to decouple layers.
+	//
+	// Parameters:
+	//   - ctx: The incoming request context.
+	//   - req: The registration model containing user credentials (login and password).
+	//
+	// Returns:
+	//   - *uuid.UUID: A pointer to the unique identifier of the newly created user.
+	//   - ErrUserAlreadyExists: If the chosen login is already taken.
+	//   - error: If password hashing fails or an unexpected database error occurs.
+	CreateUser(ctx context.Context, req *model.UserRegisterRequestModel) (*uuid.UUID, error)
 }
 
 type defaultUserService struct {
-	log *slog.Logger
+	repository repository.UserRepository
+	log        *slog.Logger
 }
 
-func NewUserService(log *slog.Logger) *defaultUserService {
+// NewUserService initializes and returns a new instance of the defaultUserService implementation.
+//
+// This constructor implements the dependency injection pattern, requiring a
+// repository.UserRepository interface to decouple business logic from the specific
+// data storage implementation.
+//
+// The provided logger is enriched with a service-level "op" (operation) context
+// ("service.UserService") to ensure consistent structured logging across all
+// user-related business operations.
+//
+// Parameters:
+//   - log: A pointer to an slog.Logger for structured diagnostic and business logging.
+//   - repository: An implementation of the UserRepository interface for data persistence.
+//
+// Returns:
+//   - A pointer to the initialized defaultUserService.
+func NewUserService(log *slog.Logger, repository repository.UserRepository) *defaultUserService {
 	return &defaultUserService{
-		log: log.With(slog.String("op", "service.UserService")),
+		log:        log.With(slog.String("op", "service.UserService")),
+		repository: repository,
 	}
 }
 
-func (s *defaultUserService) CreateUser(ctx context.Context, email string) error {
-	const op = "CreateUser"
+// Implementation of CreateUser interface of UserService interface.
+//
+// CreateUser handles the business logic for registering a new user.
+//
+// The process involves:
+//  1. Hashing the plain-text password using the bcrypt algorithm with DefaultCost.
+//  2. Setting a 5-second execution timeout for the database operation.
+//  3. Attempting to persist the user via the repository layer.
+//  4. Mapping repository-specific errors (like ErrUserAlreadyExists) into
+//     service-level domain errors to decouple layers.
+//
+// Parameters:
+//   - ctx: The incoming request context.
+//   - req: The registration model containing user credentials (login and password).
+//
+// Returns:
+//   - *uuid.UUID: A pointer to the unique identifier of the newly created user.
+//   - ErrUserAlreadyExists: If the chosen login is already taken.
+//   - error: If password hashing fails or an unexpected database error occurs.
+func (s *defaultUserService) CreateUser(ctx context.Context, req *model.UserRegisterRequestModel) (*uuid.UUID, error) {
 	log := s.log.With(
-		slog.String("op", op),
-		slog.String("email", email),
+		slog.String("op", "CreateUser"),
 	)
 
-	log.Info("attempting to create user")
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get hashed password: %w", err)
+	}
 
-	// if email == "" {
-	// 	log.Error("invalid email", logger.Err(ErrInvalidEmail))
-	// 	return ErrInvalidEmail
-	// }
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	userID, err := s.repository.CreateUser(timeoutCtx, req, hashedPassword)
+	if errors.Is(err, repository.ErrUserAlreadyExists) {
+		return nil, ErrUserAlreadyExists
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error occured while trying to create user: %w", err)
+	}
 
 	log.Info("user created successfully")
-	return nil
+	return userID, nil
 }

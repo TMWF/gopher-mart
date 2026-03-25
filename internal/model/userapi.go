@@ -1,11 +1,11 @@
 package model
 
-type UseRegisterRequestModel struct {
-	Login    string `json:"login"`
-	Password string `json:"password"`
+type UserRegisterRequestModel struct {
+	Login    string `json:"login" validate:"required,min=1"`
+	Password string `json:"password" validate:"required,min=1"`
 }
 
 type UserLoginRequestModel struct {
-	Login    string `json:"login"`
-	Password string `json:"password"`
+	Login    string `json:"login" validate:"required,min=1"`
+	Password string `json:"password" validate:"required,min=1"`
 }

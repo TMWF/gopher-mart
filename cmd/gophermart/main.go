@@ -14,6 +14,7 @@ import (
 	"github.com/TMWF/gopher-mart/internal/middleware"
 	"github.com/TMWF/gopher-mart/internal/repository"
 	"github.com/TMWF/gopher-mart/internal/service"
+	"github.com/TMWF/gopher-mart/internal/util"
 	"github.com/TMWF/gopher-mart/internal/util/validation"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
@@ -48,7 +49,6 @@ func run() {
 	}
 }
 
-// TODO: добавить к параметрам метода БД
 func createRouter(cfg *config.Config, logger *slog.Logger, pgxpool *pgxpool.Pool) http.Handler {
 	v := validator.New()
 	err := v.RegisterValidation("luhn", func(fl validator.FieldLevel) bool {
@@ -60,8 +60,10 @@ func createRouter(cfg *config.Config, logger *slog.Logger, pgxpool *pgxpool.Pool
 		log.Fatal("Error ocured while tryiong to register validator")
 	}
 
-	userService := service.NewUserService(logger)
-	userHandler := handler.NewUserHandler(userService, logger)
+	jwtBuilder := util.NewJWTBuilder(cfg)
+	userRepository := repository.NewUserRepository(pgxpool, logger)
+	userService := service.NewUserService(logger, userRepository)
+	userHandler := handler.NewUserHandler(userService, logger, jwtBuilder, v)
 
 	balanceRepository := repository.NewBalanceRepository(logger, pgxpool)
 	balanceService := service.NewBalanceService(logger, balanceRepository)

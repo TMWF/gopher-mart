@@ -7,4 +7,5 @@ var (
 	ErrIncorrectUserOrder                = errors.New("incorrect user order")
 	ErrOrderAlreadyUploadedByAnotherUser = errors.New("order already uploaded by another user")
 	ErrOrderAlreadyUploadedByThisUser    = errors.New("order already uploaded by this user")
+	ErrUserAlreadyExists                 = errors.New("user with such login already exists")
 )

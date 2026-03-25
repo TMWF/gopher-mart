@@ -12,6 +12,7 @@ import (
 	"github.com/TMWF/gopher-mart/internal/model"
 	"github.com/TMWF/gopher-mart/internal/util"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 )
 
 func JwtTokenMiddleware(config *config.Config, log *slog.Logger) func(next http.Handler) http.Handler {
@@ -40,7 +41,7 @@ func JwtTokenMiddleware(config *config.Config, log *slog.Logger) func(next http.
 	}
 }
 
-func getUserID(tokenString string, config *config.Config, log *slog.Logger) (int, error) {
+func getUserID(tokenString string, config *config.Config, log *slog.Logger) (uuid.UUID, error) {
 	claims := &model.Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims,
 		func(t *jwt.Token) (interface{}, error) {
@@ -50,12 +51,12 @@ func getUserID(tokenString string, config *config.Config, log *slog.Logger) (int
 			return []byte(config.SecretKey), nil
 		})
 	if err != nil {
-		return -1, err
+		return uuid.Nil, err
 	}
 
 	if !token.Valid {
 		log.Error("Token is not valid")
-		return -1, errors.New("token is not valid")
+		return uuid.Nil, errors.New("token is not valid")
 	}
 
 	log.Info("Token is valid")
