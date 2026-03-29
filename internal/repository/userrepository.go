@@ -111,7 +111,7 @@ func (ur *userRepository) LoginUser(ctx context.Context, req *model.UserLoginReq
 	err := ur.pool.QueryRow(ctx, query, strings.ToLower(req.Login)).Scan(&userID, &hashedPassword)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, "", fmt.Errorf("")
+			return nil, "", ErrUserDoesNotExist
 		}
 
 		return nil, "", fmt.Errorf("failed to insert user: %w", err)
