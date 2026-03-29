@@ -32,6 +32,16 @@ type UserService interface {
 	//   - ErrUserAlreadyExists: If the chosen login is already taken.
 	//   - error: If password hashing fails or an unexpected database error occurs.
 	CreateUser(ctx context.Context, req *model.UserRegisterRequestModel) (*uuid.UUID, error)
+	// LoginUser authenticates a user by verifying their credentials against the stored records.
+	//
+	// The method performs the following steps:
+	//  1. Sets a hard 5-second timeout for the database operation.
+	//  2. Retrieves the user's ID and hashed password from the repository.
+	//  3. Compares the provided plain-text password with the stored hash using bcrypt.
+	//
+	// If the user is not found in the database, it returns [ErrUserDoesNotExist].
+	// If the password does not match or a database error occurs, it returns a wrapped error.
+	LoginUser(ctx context.Context, req *model.UserLoginRequestModel) (*uuid.UUID, error)
 }
 
 type defaultUserService struct {
@@ -104,5 +114,37 @@ func (s *defaultUserService) CreateUser(ctx context.Context, req *model.UserRegi
 	}
 
 	log.Info("user created successfully")
+	return userID, nil
+}
+
+// Implementation of LoginUser method of UserService interface.
+//
+// LoginUser authenticates a user by verifying their credentials against the stored records.
+//
+// The method performs the following steps:
+//  1. Sets a hard 5-second timeout for the database operation.
+//  2. Retrieves the user's ID and hashed password from the repository.
+//  3. Compares the provided plain-text password with the stored hash using bcrypt.
+//
+// If the user is not found in the database, it returns [ErrUserDoesNotExist].
+// If the password does not match or a database error occurs, it returns a wrapped error.
+func (s *defaultUserService) LoginUser(ctx context.Context, req *model.UserLoginRequestModel) (*uuid.UUID, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	userID, hashedPassword, err := s.repository.LoginUser(timeoutCtx, req)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserDoesNotExist) {
+			return nil, ErrUserDoesNotExist
+		}
+
+		return nil, fmt.Errorf("error occured while trying to get user from database: %w", err)
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(req.Password))
+	if err != nil {
+		return nil, fmt.Errorf("error occured while comparing password hashes: %w", err)
+	}
+
 	return userID, nil
 }

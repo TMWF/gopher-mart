@@ -74,13 +74,14 @@ func (h *userHandler) RegisterUser(w http.ResponseWriter, req *http.Request) {
 	}
 
 	userID, err := h.userService.CreateUser(req.Context(), &reqBody)
-	if errors.Is(err, service.ErrUserAlreadyExists) {
-		log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusConflict)
-		return
-	}
 
 	if err != nil {
+		if errors.Is(err, service.ErrUserAlreadyExists) {
+			log.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+
 		log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -100,6 +101,22 @@ func (h *userHandler) RegisterUser(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// LoginUser handles the user authentication process via an HTTP POST request.
+//
+// The method performs the following steps:
+//  1. Verifies that the HTTP method is POST.
+//  2. Decodes the JSON request body into [model.UserLoginRequestModel].
+//  3. Validates the input fields using the configured validator.
+//  4. Authenticates the user credentials through the User Service.
+//  5. Generates a JWT token upon successful authentication.
+//  6. Sets an "HttpOnly" cookie containing the JWT with a 24-hour expiration.
+//
+// HTTP Responses:
+//   - 200 OK: Login successful; JWT cookie is set.
+//   - 400 Bad Request: Invalid JSON body or validation failed.
+//   - 401 Unauthorized: Invalid login credentials (user does not exist or password mismatch).
+//   - 405 Method Not Allowed: The request method is not POST.
+//   - 500 Internal Server Error: Unexpected error during authentication or JWT generation.
 func (h *userHandler) LoginUser(w http.ResponseWriter, req *http.Request) {
 	log := h.logger.With(slog.String("op", "LoginUser"))
 
@@ -115,4 +132,35 @@ func (h *userHandler) LoginUser(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Error occured while decoding request body", http.StatusBadRequest)
 		return
 	}
+
+	if !validation.IsValidRequest(reqBody, h.validator, log) {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := h.userService.LoginUser(req.Context(), &reqBody)
+	if err != nil {
+		if errors.Is(err, service.ErrUserDoesNotExist) {
+			log.Error(err.Error())
+			http.Error(w, "Invalid login or password", http.StatusUnauthorized)
+			return
+		}
+
+		log.Error(err.Error())
+		http.Error(w, "Unexpected error occured while trying to login user", http.StatusInternalServerError)
+		return
+	}
+
+	jwtToken, err := h.jwtBuilder.BuildJWTString(*userID)
+	if err != nil {
+		log.Error(err.Error())
+		http.Error(w, "Unexpected error occured while trying to get jwt", http.StatusInternalServerError)
+		return
+	}
+
+	cookie := http.Cookie{Name: string(util.UserID), Value: jwtToken, HttpOnly: true, MaxAge: 3600 * 24}
+	http.SetCookie(w, &cookie)
+	log.Debug("Successfully set jwt cookie")
+
+	w.WriteHeader(http.StatusOK)
 }

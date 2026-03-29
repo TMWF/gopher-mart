@@ -33,6 +33,7 @@ type UserRepository interface {
 	//   - ErrUserAlreadyExists: If a user with the same login already exists in the system.
 	//   - error: A wrapped database error if the query execution or scanning fails.
 	CreateUser(ctx context.Context, req *model.UserRegisterRequestModel, hashedPassword []byte) (*uuid.UUID, error)
+	LoginUser(ctx context.Context, req *model.UserLoginRequestModel) (*uuid.UUID, string, error)
 }
 
 type userRepository struct {
@@ -86,7 +87,7 @@ func (ur *userRepository) CreateUser(ctx context.Context, req *model.UserRegiste
 
 	var userID uuid.UUID
 
-	err := ur.pool.QueryRow(ctx, query, strings.ToLower(req.Login), hashedPassword).Scan(&userID)
+	err := ur.pool.QueryRow(ctx, query, strings.ToLower(req.Login), string(hashedPassword)).Scan(&userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrUserAlreadyExists
@@ -96,4 +97,25 @@ func (ur *userRepository) CreateUser(ctx context.Context, req *model.UserRegiste
 	}
 
 	return &userID, nil
+}
+
+func (ur *userRepository) LoginUser(ctx context.Context, req *model.UserLoginRequestModel) (*uuid.UUID, string, error) {
+	const query = `
+	SELECT id, password 
+	FROM users 
+	WHERE login=$1;
+	`
+
+	var userID uuid.UUID
+	var hashedPassword string
+	err := ur.pool.QueryRow(ctx, query, strings.ToLower(req.Login)).Scan(&userID, &hashedPassword)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, "", fmt.Errorf("")
+		}
+
+		return nil, "", fmt.Errorf("failed to insert user: %w", err)
+	}
+
+	return &userID, hashedPassword, nil
 }
