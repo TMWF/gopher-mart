@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/TMWF/gopher-mart/internal/logger"
 	"github.com/TMWF/gopher-mart/internal/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -78,22 +79,54 @@ func NewUserRepository(pool *pgxpool.Pool, logger *slog.Logger) *userRepository 
 //   - ErrUserAlreadyExists: If a user with the same login already exists in the system.
 //   - error: A wrapped database error if the query execution or scanning fails.
 func (ur *userRepository) CreateUser(ctx context.Context, req *model.UserRegisterRequestModel, hashedPassword []byte) (*uuid.UUID, error) {
-	const query = `
+	log := ur.logger.With(slog.String("op", "CreateUser"))
+	const createUserQuery = `
 	INSERT INTO users (login, password)
 	VALUES ($1, $2)
 	ON CONFLICT (login) DO NOTHING
 	RETURNING id;
 	`
 
+	const createBalanceQuery = `
+	INSERT INTO balances (current_balance, user_id)
+	VALUES ($1, $2)
+	ON CONFLICT (user_id) DO NOTHING;
+	`
+	tx, err := ur.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil {
+			log.Error(
+				"Failed to properly close transaction",
+				logger.Err(err),
+			)
+		}
+		log.Debug("Successfully closed transaction")
+	}()
+
 	var userID uuid.UUID
 
-	err := ur.pool.QueryRow(ctx, query, strings.ToLower(req.Login), string(hashedPassword)).Scan(&userID)
+	err = tx.QueryRow(ctx, createUserQuery, strings.ToLower(req.Login), string(hashedPassword)).Scan(&userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrUserAlreadyExists
 		}
 
 		return nil, fmt.Errorf("failed to insert user: %w", err)
+	}
+
+	ct, err := tx.Exec(ctx, createBalanceQuery, 0, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info("Command tag in creating balance query", slog.String("CommandTag", ct.String()))
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
 	}
 
 	return &userID, nil

@@ -24,7 +24,7 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 	log := logger.With(slog.String("op", "config.InitialiseConfigs"))
 
 	cfg := &Config{}
-	var serverHostFlag string
+	var serverHost string
 	var accrualSystemAddress string
 	// var baseURLFlag string
 	// var logLevel string
@@ -33,12 +33,12 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 	var tokenExp int
 	var secretKey string
 
-	flag.StringVar(&serverHostFlag, "a", "localhost:8080", "address and port to run server")
-	flag.StringVar(&serverHostFlag, "r", "", "accrual system address")
+	flag.StringVar(&serverHost, "a", "localhost:8080", "address and port to run server")
+	flag.StringVar(&accrualSystemAddress, "r", "", "accrual system address")
 	// flag.StringVar(&baseURLFlag, "b", "http://localhost:8080", "address and port to run server")
 	// flag.StringVar(&logLevel, "c", "DEBUG", "logging level")
 	// flag.StringVar(&urlStoragePath, "f", "", "File storage path for urls")
-	flag.StringVar(&databaseDSN, "d", "", "PostgreSQL DSN")
+	flag.StringVar(&databaseDSN, "d", "postgres://admin:admin@localhost:5432/postgres?sslmode=disable", "PostgreSQL DSN")
 	flag.IntVar(&tokenExp, "t", 3, "Token expiration in hours")
 	flag.StringVar(&secretKey, "s", "supersecretkey", "JWT secret key")
 	flag.Parse()
@@ -49,11 +49,11 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 	}
 
 	if cfg.RunAddress == "" {
-		cfg.RunAddress = serverHostFlag
+		cfg.RunAddress = serverHost
 	}
 
 	if cfg.AccrualSystemAddress == "" {
-		cfg.RunAddress = accrualSystemAddress
+		cfg.AccrualSystemAddress = accrualSystemAddress
 	}
 
 	// if cfg.BaseURL == "" {

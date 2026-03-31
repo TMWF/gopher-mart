@@ -14,8 +14,10 @@ import (
 	"github.com/TMWF/gopher-mart/internal/middleware"
 	"github.com/TMWF/gopher-mart/internal/repository"
 	"github.com/TMWF/gopher-mart/internal/service"
+	"github.com/TMWF/gopher-mart/internal/service/worker"
 	"github.com/TMWF/gopher-mart/internal/util"
 	"github.com/TMWF/gopher-mart/internal/util/validation"
+	"github.com/TMWF/gopher-mart/migrations"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-playground/validator"
@@ -33,6 +35,12 @@ func run() {
 	}
 	logger := mylogger.SetupLogger(env)
 	cfg := config.InitialiseConfigs(logger)
+
+	err := migrations.RunMigrations(cfg.DatabaseDSN, logger)
+	if err != nil {
+		log.Fatal("Failed to run migrations", err)
+	}
+
 	pgxpool, err := database.NewPostgresPool(context.Background(), cfg.DatabaseDSN)
 	if err != nil {
 		logger.Error("failed to initialise pgxpool server", mylogger.Err(err))
@@ -41,15 +49,19 @@ func run() {
 
 	defer pgxpool.Close()
 
-	logger.Info("starting application", slog.String("env", env))
-	router := createRouter(cfg, logger, pgxpool)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	logger.Info("starting application", slog.String("env", env), slog.String("host", cfg.RunAddress))
+	router := createRouter(ctx, cfg, logger, pgxpool)
+
 	logger.Info("startingServer", slog.String("address", cfg.RunAddress))
 	if err := http.ListenAndServe(cfg.RunAddress, router); err != nil {
 		log.Fatal("failed to start server", err)
 	}
 }
 
-func createRouter(cfg *config.Config, logger *slog.Logger, pgxpool *pgxpool.Pool) http.Handler {
+func createRouter(ctx context.Context, cfg *config.Config, logger *slog.Logger, pgxpool *pgxpool.Pool) http.Handler {
 	v := validator.New()
 	err := v.RegisterValidation("luhn", func(fl validator.FieldLevel) bool {
 		value := fl.Field().String()
@@ -72,6 +84,16 @@ func createRouter(cfg *config.Config, logger *slog.Logger, pgxpool *pgxpool.Pool
 	ordersRepository := repository.NewOrdersRepository(pgxpool, logger)
 	ordersService := service.NewOrdersService(logger, ordersRepository)
 	ordersHandler := handler.NewOrdersHandler(logger, ordersService)
+
+	accrualWorker := worker.NewAccrualWorker(
+		ordersRepository,
+		cfg.AccrualSystemAddress,
+		logger,
+		3,
+		2,
+	)
+
+	go accrualWorker.Run(ctx)
 
 	router := chi.NewRouter()
 

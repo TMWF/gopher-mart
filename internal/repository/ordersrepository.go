@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/TMWF/gopher-mart/internal/logger"
 	"github.com/TMWF/gopher-mart/internal/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -45,6 +46,8 @@ type OrdersRepository interface {
 	//   - []model.GetUserOrdersResponseModel: A list of orders (empty slice if none found).
 	//   - error: Database execution errors or row scanning failures.
 	GetUserOrders(ctx context.Context, userID uuid.UUID) ([]model.GetUserOrdersResponseModel, error)
+	UpdateOrderAndBalance(ctx context.Context, order model.OrderModel, accrualResponse model.AccrualResponseModel) error
+	FetchUnprocessedOrders(ctx context.Context, batchSize int) ([]model.OrderModel, error)
 }
 
 type ordersRepository struct {
@@ -170,4 +173,91 @@ func (or *ordersRepository) GetUserOrders(ctx context.Context, userID uuid.UUID)
 	}
 
 	return result, nil
+}
+
+func (or *ordersRepository) UpdateOrderAndBalance(
+	ctx context.Context, order model.OrderModel,
+	accrualResponse model.AccrualResponseModel,
+) error {
+
+	if needUpdateOrder(order, accrualResponse) {
+		return nil
+	}
+
+	log := or.logger.With(slog.String("op", "UpdateOrderAndBalance"))
+
+	statusForUpdate := getStatusForUpdate(order, accrualResponse)
+
+	tx, err := or.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil {
+			log.Error(
+				"Failed to properly close transaction",
+				logger.Err(err),
+			)
+		}
+		log.Debug("Successfully closed transaction")
+	}()
+
+	_, err = tx.Exec(ctx,
+		"UPDATE orders SET status = '$1', accrual = $2 WHERE id = $3",
+		statusForUpdate,
+		accrualResponse.Accrual,
+		order.ID)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx,
+		"UPDATE balances SET current_balance = current + $1 WHERE user_id = $2",
+		accrualResponse.Accrual, order.UserID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (or *ordersRepository) FetchUnprocessedOrders(ctx context.Context, batchSize int) ([]model.OrderModel, error) {
+	rows, err := or.pool.Query(ctx, `
+  SELECT id, user_id, status FROM orders 
+  WHERE status IN ('NEW', 'PROCESSING') 
+  LIMIT $1 
+  FOR UPDATE SKIP LOCKED`, batchSize)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []model.OrderModel
+	for rows.Next() {
+		var o model.OrderModel
+		if err := rows.Scan(&o.ID, &o.UserID, &o.Status); err != nil {
+			return nil, err
+		}
+		orders = append(orders, o)
+	}
+	return orders, nil
+}
+
+func needUpdateOrder(order model.OrderModel, accrualResponse model.AccrualResponseModel) bool {
+	if order.Status == "PROCESSING" && (accrualResponse.Status != "INVALID" || accrualResponse.Status != "PROCESSED") {
+		return false
+	}
+
+	return true
+}
+
+func getStatusForUpdate(order model.OrderModel, accrualResponse model.AccrualResponseModel) string {
+	if order.Status == "NEW" && (accrualResponse.Status != "INVALID" || accrualResponse.Status != "PROCESSED") {
+		return "PROCESSING"
+	}
+
+	return accrualResponse.Status
 }

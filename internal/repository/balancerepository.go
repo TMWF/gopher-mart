@@ -94,13 +94,15 @@ func NewBalanceRepository(logger *slog.Logger, pool *pgxpool.Pool) *balanceRepos
 //   - error, if occured any while retrieving data from database
 func (br *balanceRepository) GetBalanceForUser(ctx context.Context, userID uuid.UUID) (*model.GetBalanceResponseModel, error) {
 	response := model.GetBalanceResponseModel{}
+	log := br.logger.With(slog.String("op", "GetBalanceForUser"))
+	log.Debug("Trying to get balance for user", slog.String("user", userID.String()))
 
 	query := `SELECT b.current_balance, COALESCE(SUM(w.sum), 0) FROM balances as b
 	JOIN users as u ON u.id = b.user_id
-	JOIN orders as o ON o.user_id = u.id
-	JOIN withdrawals as w ON w.order_id = o.id
+	LEFT JOIN orders as o ON o.user_id = u.id
+	LEFT JOIN withdrawals as w ON w.order_id = o.id
 	WHERE u.id = $1
-	GROUB BY(u.id, b.current_balance)`
+	GROUP BY(u.id, b.current_balance)`
 
 	err := br.pool.QueryRow(ctx, query, userID).Scan(&response.Current, &response.WithDrawn)
 
