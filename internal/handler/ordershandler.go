@@ -59,7 +59,7 @@ func (oh *ordersHandler) UploadOrder(w http.ResponseWriter, req *http.Request) {
 
 	bodyString := string(bodyBytes)
 	if !validation.IsLuhnValid(bodyString) {
-		log.Error("Order num has not passed Luhn Validation")
+		log.Error("Order num has not passed Luhn Validation", slog.String("orderID", bodyString))
 		http.Error(w, "Incorrect order num", http.StatusUnprocessableEntity)
 		return
 	}
@@ -75,11 +75,11 @@ func (oh *ordersHandler) UploadOrder(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 
 	case errors.Is(err, repository.ErrOrderAlreadyUploadedByThisUser):
-		log.Error(err.Error())
+		log.Error(err.Error(), slog.String("orderID", bodyString))
 		http.Error(w, err.Error(), http.StatusOK)
 
 	case errors.Is(err, repository.ErrOrderAlreadyUploadedByAnotherUser):
-		log.Error(err.Error())
+		log.Error(err.Error(), slog.String("orderID", bodyString))
 		http.Error(w, err.Error(), http.StatusConflict)
 
 	default:
