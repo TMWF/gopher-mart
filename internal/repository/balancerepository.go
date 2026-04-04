@@ -192,12 +192,12 @@ func (br *balanceRepository) WithdrawForUserOrder(ctx context.Context, userId uu
 		return err
 	}
 
-	balanceAfterWithDrawal := userBalance - req.Sum
+	// balanceAfterWithDrawal := userBalance - req.Sum
 	updateUserBalanceQuery := `UPDATE balances
-	SET balance = $1
+	SET current_balance = current_balance - $1
 	WHERE user_id = $2`
 
-	_, err = tx.Exec(ctx, updateUserBalanceQuery, balanceAfterWithDrawal, userId)
+	_, err = tx.Exec(ctx, updateUserBalanceQuery, req.Sum, userId)
 	if err != nil {
 		return err
 	}
