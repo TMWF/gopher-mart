@@ -207,19 +207,21 @@ func (or *ordersRepository) UpdateOrderAndBalance(
 	}()
 
 	_, err = tx.Exec(ctx,
-		"UPDATE orders SET status = '$1', accrual = $2 WHERE id = $3",
+		"UPDATE orders SET status = $1, accrual = $2 WHERE id = $3",
 		statusForUpdate,
 		accrualResponse.Accrual,
 		order.ID)
 
 	if err != nil {
+		log.Error("Could not update order", err)
 		return err
 	}
 
 	_, err = tx.Exec(ctx,
-		"UPDATE balances SET current_balance = current + $1 WHERE user_id = $2",
+		"UPDATE balances SET current_balance = current_balance + $1 WHERE user_id = $2",
 		accrualResponse.Accrual, order.UserID)
 	if err != nil {
+		log.Error("Could not update balance", err)
 		return err
 	}
 
