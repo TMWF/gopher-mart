@@ -157,7 +157,7 @@ func (br *balanceRepository) WithdrawForUserOrder(ctx context.Context, userId uu
 		return err
 	}
 
-	if req.Sum < userBalance {
+	if req.Sum > userBalance {
 		return ErrBalanceNotEnough
 	}
 
@@ -177,11 +177,12 @@ func (br *balanceRepository) WithdrawForUserOrder(ctx context.Context, userId uu
 		return err
 	}
 
-	insertIntoWithDrawalsTable := `INSERT INTO withdrawals (sum, user_id, order_id) 
-	VALUES ($1, $2, $3)`
+	insertIntoWithDrawalsTable := `INSERT INTO withdrawals (sum, order_id) 
+	VALUES ($1, $2)`
 
-	_, err = tx.Exec(ctx, insertIntoWithDrawalsTable, req.Sum, userId, orderId)
+	_, err = tx.Exec(ctx, insertIntoWithDrawalsTable, req.Sum, orderId)
 	if err != nil {
+		log.Error("Error occured while inserting into withdrawals table", logger.Err(err))
 		return err
 	}
 
