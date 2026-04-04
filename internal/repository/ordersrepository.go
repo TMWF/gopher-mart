@@ -190,6 +190,7 @@ func (or *ordersRepository) UpdateOrderAndBalance(
 	}
 
 	statusForUpdate := getStatusForUpdate(order, accrualResponse)
+	log.Debug("status for update", statusForUpdate)
 
 	tx, err := or.pool.Begin(ctx)
 	if err != nil {

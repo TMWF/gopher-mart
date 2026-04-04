@@ -118,12 +118,10 @@ func (ur *userRepository) CreateUser(ctx context.Context, req *model.UserRegiste
 		return nil, fmt.Errorf("failed to insert user: %w", err)
 	}
 
-	ct, err := tx.Exec(ctx, createBalanceQuery, 0, userID)
+	_, err = tx.Exec(ctx, createBalanceQuery, 0, userID)
 	if err != nil {
 		return nil, err
 	}
-
-	log.Info("Command tag in creating balance query", slog.String("CommandTag", ct.String()))
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
