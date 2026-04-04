@@ -112,7 +112,9 @@ func (w *accrualWorker) processOrder(ctx context.Context, order model.OrderModel
 		return nil // Пропускаем итерацию, заказ вернется в очередь при следующем опросе БД
 	}
 
-	resp, err := w.client.Get(fmt.Sprintf("%s%s", w.accrualURL, order.ID))
+	url := fmt.Sprintf("%s%s", w.accrualURL, order.ID)
+	log.Debug("Accrual URL: " + url)
+	resp, err := w.client.Get(url)
 	if err != nil {
 		log.Error("Failed to send request to accrual system", logger.Err(err))
 		return err
