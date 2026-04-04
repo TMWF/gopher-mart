@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
@@ -21,7 +22,9 @@ func RunMigrations(databaseURL string, logger *slog.Logger) error {
 		return fmt.Errorf("failed to create source driver: %w", err)
 	}
 
-	migrateURL := "pgx5://" + databaseURL[len("postgres://"):]
+	// migrateURL := "pgx5://" + databaseURL[len("postgres://"):]
+	migrateURL := getDsn(databaseURL)
+
 	m, err := migrate.NewWithSourceInstance("iofs", d, migrateURL)
 	if err != nil {
 		return fmt.Errorf("failed to initialize migrate: %w", err)
@@ -63,4 +66,14 @@ func RunMigrations(databaseURL string, logger *slog.Logger) error {
 
 	// logger.Info("Migrations applied successfully")
 	// return nil
+}
+
+func getDsn(dsn string) string {
+	if strings.Contains(dsn, "://") {
+		dsn = strings.Replace(dsn, "postgres://", "pgx5://", 1)
+		dsn = strings.Replace(dsn, "postgresql://", "pgx5://", 1)
+		return dsn
+	}
+
+	return "pgx5://" + dsn
 }
