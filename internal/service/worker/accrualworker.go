@@ -109,10 +109,10 @@ func (w *accrualWorker) processOrder(ctx context.Context, order model.OrderModel
 	w.retryMu.RUnlock()
 
 	if time.Now().Before(pauseUntil) {
-		return nil // Пропускаем итерацию, заказ вернется в очередь при следующем опросе БД
+		return nil
 	}
 
-	url := fmt.Sprintf("%s%s", w.accrualURL, order.ID)
+	url := fmt.Sprintf("%s%s", w.accrualURL, order.Num)
 	log.Debug("Accrual URL: " + url)
 	resp, err := w.client.Get(url)
 	if err != nil {

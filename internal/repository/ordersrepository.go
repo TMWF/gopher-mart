@@ -225,7 +225,7 @@ func (or *ordersRepository) UpdateOrderAndBalance(
 
 func (or *ordersRepository) FetchUnprocessedOrders(ctx context.Context, batchSize int) ([]model.OrderModel, error) {
 	rows, err := or.pool.Query(ctx, `
-  SELECT id, user_id, status FROM orders 
+  SELECT id, order_id, user_id, status FROM orders 
   WHERE status IN ('NEW', 'PROCESSING') 
   LIMIT $1 
   FOR UPDATE SKIP LOCKED`, batchSize)
@@ -238,7 +238,7 @@ func (or *ordersRepository) FetchUnprocessedOrders(ctx context.Context, batchSiz
 	var orders []model.OrderModel
 	for rows.Next() {
 		var o model.OrderModel
-		if err := rows.Scan(&o.ID, &o.UserID, &o.Status); err != nil {
+		if err := rows.Scan(&o.ID, &o.Num, &o.UserID, &o.Status); err != nil {
 			return nil, err
 		}
 		orders = append(orders, o)

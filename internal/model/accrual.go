@@ -10,6 +10,7 @@ type AccrualResponseModel struct {
 
 type OrderModel struct {
 	ID     uuid.UUID
+	Num    string
 	UserID uuid.UUID
 	Status string
 }
