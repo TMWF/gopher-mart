@@ -83,9 +83,11 @@ func (w *accrualWorker) Run(ctx context.Context) {
 			}
 
 			for _, order := range orders {
-				log.Debug("Sending order to chsnnel",
+				log.Debug("Sending order to channel",
 					slog.String("orderId", order.ID.String()),
-					slog.String("orderStatus", order.Status))
+					slog.String("orderStatus", order.Status),
+					slog.String("Num", order.Num),
+				)
 				orderChan <- order
 			}
 		}

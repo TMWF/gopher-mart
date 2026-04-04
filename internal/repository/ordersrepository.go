@@ -176,15 +176,18 @@ func (or *ordersRepository) GetUserOrders(ctx context.Context, userID uuid.UUID)
 }
 
 func (or *ordersRepository) UpdateOrderAndBalance(
-	ctx context.Context, order model.OrderModel,
+	ctx context.Context,
+	order model.OrderModel,
 	accrualResponse model.AccrualResponseModel,
 ) error {
+	log := or.logger.With(slog.String("op", "UpdateOrderAndBalance"))
 
-	if needUpdateOrder(order, accrualResponse) {
+	if !needUpdateOrder(order, accrualResponse) {
+		log.Debug("Order doesn't need to be updated",
+			slog.String("order", order.String()),
+			slog.String("accrualResponse", accrualResponse.String()))
 		return nil
 	}
-
-	log := or.logger.With(slog.String("op", "UpdateOrderAndBalance"))
 
 	statusForUpdate := getStatusForUpdate(order, accrualResponse)
 
@@ -219,6 +222,11 @@ func (or *ordersRepository) UpdateOrderAndBalance(
 	if err != nil {
 		return err
 	}
+
+	log.Debug("Order updated",
+		slog.String("order", order.String()),
+		slog.String("accrualResponse", accrualResponse.String()),
+	)
 
 	return tx.Commit(ctx)
 }
