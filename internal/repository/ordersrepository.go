@@ -190,7 +190,7 @@ func (or *ordersRepository) UpdateOrderAndBalance(
 	}
 
 	statusForUpdate := getStatusForUpdate(order, accrualResponse)
-	log.Debug("status for update", statusForUpdate)
+	log.Debug("status for update: " + statusForUpdate)
 
 	tx, err := or.pool.Begin(ctx)
 	if err != nil {
@@ -203,8 +203,9 @@ func (or *ordersRepository) UpdateOrderAndBalance(
 				"Failed to properly close transaction",
 				logger.Err(err),
 			)
+		} else {
+			log.Debug("Successfully closed transaction")
 		}
-		log.Debug("Successfully closed transaction")
 	}()
 
 	_, err = tx.Exec(ctx,
@@ -258,7 +259,7 @@ func (or *ordersRepository) FetchUnprocessedOrders(ctx context.Context, batchSiz
 }
 
 func needUpdateOrder(order model.OrderModel, accrualResponse model.AccrualResponseModel) bool {
-	if order.Status == "PROCESSING" && (accrualResponse.Status != "INVALID" || accrualResponse.Status != "PROCESSED") {
+	if order.Status == "PROCESSING" && (accrualResponse.Status != "INVALID" && accrualResponse.Status != "PROCESSED") {
 		return false
 	}
 
@@ -266,7 +267,7 @@ func needUpdateOrder(order model.OrderModel, accrualResponse model.AccrualRespon
 }
 
 func getStatusForUpdate(order model.OrderModel, accrualResponse model.AccrualResponseModel) string {
-	if order.Status == "NEW" && (accrualResponse.Status != "INVALID" || accrualResponse.Status != "PROCESSED") {
+	if order.Status == "NEW" && (accrualResponse.Status != "INVALID" && accrualResponse.Status != "PROCESSED") {
 		return "PROCESSING"
 	}
 
