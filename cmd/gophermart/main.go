@@ -106,6 +106,7 @@ func createRouter(ctx context.Context, cfg *config.Config, logger *slog.Logger, 
 	router.Post(`/api/user/login`, userHandler.LoginUser)
 	router.Get(`/api/user/balance`, balanceHandler.GetBalanceForUser)
 	router.Post(`/api/user/balance/withdraw`, balanceHandler.WithdrawForOrder)
+	router.Get(`/api/user/withdrawals`, balanceHandler.GetUserWithdrawals)
 	router.Post(`/api/user/orders`, ordersHandler.UploadOrder)
 	router.Get(`/api/user/orders`, ordersHandler.GetUserOrders)
 	return router
