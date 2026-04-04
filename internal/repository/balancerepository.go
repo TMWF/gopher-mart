@@ -170,10 +170,16 @@ func (br *balanceRepository) WithdrawForUserOrder(ctx context.Context, userId uu
 	err = tx.QueryRow(ctx, selectOrderIdQuery, userId, req.Order).Scan(&orderId)
 
 	if errors.Is(err, pgx.ErrNoRows) {
+		log.Error("Didn't find user order",
+			slog.String("userID", userId.String()),
+			slog.String("order_id", req.Order),
+		)
+
 		return ErrIncorrectUserOrder
 	}
 
 	if err != nil {
+		log.Error("Error occured while trying to get user order", logger.Err(err))
 		return err
 	}
 
