@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS orders (
     id UUID     PRIMARY KEY     DEFAULT gen_random_uuid(),
     order_id    TEXT            NOT NULL UNIQUE,
     status      TEXT            NOT NULL,
-    accrual     NUMERIC(21, 4)  NOT NULL,
+    accrual     NUMERIC(21, 4)  NOT NULL DEFAULT 0,
     user_id     UUID            NOT NULL,
     created_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
