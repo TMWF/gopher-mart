@@ -56,7 +56,7 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 	if cfg.AccrualSystemAddress == "" {
 		cfg.AccrualSystemAddress = accrualSystemAddress
 	}
-	log.Debug("Accrual :" + cfg.AccrualSystemAddress)
+	log.Debug("Accrual: " + cfg.AccrualSystemAddress)
 
 	// if cfg.BaseURL == "" {
 	// 	cfg.BaseURL = baseURLFlag
@@ -70,7 +70,7 @@ func InitialiseConfigs(logger *slog.Logger) *Config {
 		log.Debug("Setting database config")
 		cfg.DatabaseDSN = databaseDSN
 	}
-	log.Debug(cfg.DatabaseDSN)
+	log.Debug("DatabaseDSN: " + cfg.DatabaseDSN)
 
 	if cfg.SecretKey == "" {
 		cfg.SecretKey = secretKey
