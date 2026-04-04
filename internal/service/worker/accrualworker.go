@@ -44,6 +44,7 @@ func NewAccrualWorker(
 }
 
 func (w *accrualWorker) Run(ctx context.Context) {
+	log := w.logger.With(slog.String("op", "Run"))
 	orderChan := make(chan model.OrderModel, w.maxWorkers)
 	var wg sync.WaitGroup
 
@@ -59,8 +60,10 @@ func (w *accrualWorker) Run(ctx context.Context) {
 	defer ticker.Stop()
 
 	for {
+		log.Debug("Starting scheduled work")
 		select {
 		case <-ctx.Done():
+			log.Warn("Finishing scheduler")
 			close(orderChan)
 			wg.Wait()
 			return
@@ -69,16 +72,20 @@ func (w *accrualWorker) Run(ctx context.Context) {
 			waiting := time.Now().Before(w.retryAfter)
 			w.retryMu.RUnlock()
 			if waiting {
+				log.Debug("Skipping worker iteration cause still waiting")
 				continue
 			}
 
 			orders, err := w.repository.FetchUnprocessedOrders(ctx, w.maxWorkers*2)
 			if err != nil {
-				w.logger.Error("failed to fetch orders", "err", err)
+				log.Error("failed to fetch orders", "err", err)
 				continue
 			}
 
 			for _, order := range orders {
+				log.Debug("Sending order to chsnnel",
+					slog.String("orderId", order.ID.String()),
+					slog.String("orderStatus", order.Status))
 				orderChan <- order
 			}
 		}
@@ -86,10 +93,11 @@ func (w *accrualWorker) Run(ctx context.Context) {
 }
 
 func (w *accrualWorker) worker(ctx context.Context, orders <-chan model.OrderModel) {
+	log := w.logger.With(slog.String("op", "worker"))
 	for order := range orders {
 		err := w.processOrder(ctx, order)
 		if err != nil {
-			w.logger.Error("failed to process order", "order_id", order.ID, "err", err)
+			log.Error("failed to process order", "order_id", order.ID, "err", err)
 		}
 	}
 }
@@ -106,6 +114,7 @@ func (w *accrualWorker) processOrder(ctx context.Context, order model.OrderModel
 
 	resp, err := w.client.Get(fmt.Sprintf("%s%s", w.accrualURL, order.ID))
 	if err != nil {
+		log.Error("Failed to send request to accrual system", logger.Err(err))
 		return err
 	}
 	defer func() {
