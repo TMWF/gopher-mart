@@ -100,7 +100,7 @@ func (bh *balanceHandler) WithdrawForOrder(w http.ResponseWriter, req *http.Requ
 	}
 
 	if !validation.IsValidRequest(reqBody, bh.validator, log) {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, "Invalid request body", http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -114,12 +114,6 @@ func (bh *balanceHandler) WithdrawForOrder(w http.ResponseWriter, req *http.Requ
 	if errors.Is(err, repository.ErrBalanceNotEnough) {
 		log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusPaymentRequired)
-		return
-	}
-
-	if errors.Is(err, repository.ErrIncorrectUserOrder) {
-		log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 

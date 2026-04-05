@@ -2,13 +2,11 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"github.com/TMWF/gopher-mart/internal/logger"
 	"github.com/TMWF/gopher-mart/internal/model"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -100,7 +98,7 @@ func (br *balanceRepository) GetBalanceForUser(ctx context.Context, userID uuid.
 	query := `SELECT b.current_balance, COALESCE(SUM(w.sum), 0) FROM balances as b
 	JOIN users as u ON u.id = b.user_id
 	LEFT JOIN orders as o ON o.user_id = u.id
-	LEFT JOIN withdrawals as w ON w.order_id = o.id
+	LEFT JOIN withdrawals as w ON w.user_id = u.id
 	WHERE u.id = $1
 	GROUP BY(u.id, b.current_balance)`
 
@@ -161,32 +159,10 @@ func (br *balanceRepository) WithdrawForUserOrder(ctx context.Context, userId uu
 		return ErrBalanceNotEnough
 	}
 
-	var orderId uuid.UUID
-	selectOrderIdQuery := `SELECT o.id FROM orders as o
-	JOIN users as u ON u.id = o.user_id
-	WHERE u.id = $1
-	AND o.order_id = $2`
+	insertIntoWithDrawalsTable := `INSERT INTO withdrawals (sum, order_num, user_id) 
+	VALUES ($1, $2, $3)`
 
-	err = tx.QueryRow(ctx, selectOrderIdQuery, userId, req.Order).Scan(&orderId)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		log.Error("Didn't find user order",
-			slog.String("userID", userId.String()),
-			slog.String("order_id", req.Order),
-		)
-
-		return ErrIncorrectUserOrder
-	}
-
-	if err != nil {
-		log.Error("Error occured while trying to get user order", logger.Err(err))
-		return err
-	}
-
-	insertIntoWithDrawalsTable := `INSERT INTO withdrawals (sum, order_id) 
-	VALUES ($1, $2)`
-
-	_, err = tx.Exec(ctx, insertIntoWithDrawalsTable, req.Sum, orderId)
+	_, err = tx.Exec(ctx, insertIntoWithDrawalsTable, req.Sum, req.Order, userId)
 	if err != nil {
 		log.Error("Error occured while inserting into withdrawals table", logger.Err(err))
 		return err
@@ -226,9 +202,8 @@ func (br *balanceRepository) WithdrawForUserOrder(ctx context.Context, userId uu
 // The function ensures proper resource management by deferring rows.Close()
 // and performs a final check for errors encountered during row iteration via rows.Err().
 func (br *balanceRepository) GetUserWithdrawals(ctx context.Context, userID uuid.UUID) ([]model.GetUserWithdrawalsResponseModel, error) {
-	query := `SELECT o.order_id, w.sum, w.created_at FROM withdrawals as w
-	JOIN orders as o ON o.id = w.order_id
-	JOIN users as u ON u.id = o.user_id
+	query := `SELECT w.order_num, w.sum, w.created_at FROM withdrawals as w
+	JOIN users as u ON u.id = w.user_id
 	WHERE u.id = $1
 	ORDER BY w.created_at DESC`
 

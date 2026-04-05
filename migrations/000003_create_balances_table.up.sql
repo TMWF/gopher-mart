@@ -9,5 +9,8 @@ CREATE TABLE IF NOT EXISTS balances (
     CONSTRAINT fk_user
     FOREIGN KEY (user_id)
     REFERENCES users (id)
-    ON DELETE RESTRICT
+    ON DELETE RESTRICT,
+
+    CONSTRAINT chk_balance_nonnegative
+    CHECK (current_balance >= 0)
 );
