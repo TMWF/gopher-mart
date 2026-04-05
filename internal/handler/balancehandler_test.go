@@ -47,7 +47,7 @@ func TestBalanceHandler_GetBalanceForUser(t *testing.T) {
 
 	successResponse := &model.GetBalanceResponseModel{
 		Current:   500.5,
-		WithDrawn: 100.0,
+		Withdrawn: 100.0,
 	}
 
 	type fields struct {

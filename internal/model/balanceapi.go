@@ -4,7 +4,7 @@ import "time"
 
 type GetBalanceResponseModel struct {
 	Current   float64 `json:"current"`
-	WithDrawn float64 `json:"withdrawn"`
+	Withdrawn float64 `json:"withdrawn"`
 }
 
 type WithDrawBalanceRequestModel struct {

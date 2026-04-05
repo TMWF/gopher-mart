@@ -102,7 +102,7 @@ func (br *balanceRepository) GetBalanceForUser(ctx context.Context, userID uuid.
 	WHERE u.id = $1
 	GROUP BY(u.id, b.current_balance)`
 
-	err := br.pool.QueryRow(ctx, query, userID).Scan(&response.Current, &response.WithDrawn)
+	err := br.pool.QueryRow(ctx, query, userID).Scan(&response.Current, &response.Withdrawn)
 
 	if err != nil {
 		return nil, err
