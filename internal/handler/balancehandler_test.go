@@ -45,7 +45,6 @@ func (m *MockBalanceService) GetUserWithdrawals(ctx context.Context) ([]model.Ge
 func TestBalanceHandler_GetBalanceForUser(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	// Тестовые данные
 	successResponse := &model.GetBalanceResponseModel{
 		Current:   500.5,
 		WithDrawn: 100.0,
@@ -83,7 +82,7 @@ func TestBalanceHandler_GetBalanceForUser(t *testing.T) {
 		{
 			name: "Error 405 Method Not Allowed",
 			fields: fields{
-				mockService: &MockBalanceService{}, // Сервис не должен вызываться
+				mockService: &MockBalanceService{},
 			},
 			args:       args{method: http.MethodPost},
 			wantStatus: http.StatusMethodNotAllowed,
@@ -116,20 +115,15 @@ func TestBalanceHandler_GetBalanceForUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// 1. Setup
 			bh := NewBalanceHandler(logger, tt.fields.mockService, nil)
 
-			// 2. Create Request & Recorder
 			req := httptest.NewRequest(tt.args.method, "/api/user/balance", nil)
 			w := httptest.NewRecorder()
 
-			// 3. Execute
 			bh.GetBalanceForUser(w, req)
 
-			// 4. Assert Status
 			assert.Equal(t, tt.wantStatus, w.Code)
 
-			// 5. Assert Body & Headers (if success)
 			if tt.wantStatus == http.StatusOK {
 				var gotBody model.GetBalanceResponseModel
 				err := json.Unmarshal(w.Body.Bytes(), &gotBody)
@@ -146,7 +140,6 @@ func TestBalanceHandler_GetBalanceForUser(t *testing.T) {
 }
 
 func TestBalanceHandler_WithdrawForOrder(t *testing.T) {
-	// Инициализируем зависимости
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	v := validator.New()
 	err := v.RegisterValidation("luhn", func(fl validator.FieldLevel) bool {
@@ -198,8 +191,8 @@ func TestBalanceHandler_WithdrawForOrder(t *testing.T) {
 			name:   "Error 422 Unprocessable Entity (Validation Failed)",
 			method: http.MethodPost,
 			requestBody: model.WithDrawBalanceRequestModel{
-				Order: "123", // Не пройдет валидацию (слишком короткий или не по Луну)
-				Sum:   -10,   // Отрицательная сумма
+				Order: "123",
+				Sum:   -10,
 			},
 			mockSetup:      func(m *MockBalanceService) {},
 			expectedStatus: http.StatusUnprocessableEntity,
@@ -250,12 +243,10 @@ func TestBalanceHandler_WithdrawForOrder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup mock
 			mockService := &MockBalanceService{}
 			tt.mockSetup(mockService)
 			bh := NewBalanceHandler(logger, mockService, v)
 
-			// Подготовка тела запроса
 			var body io.Reader
 			if tt.requestBody != nil {
 				if s, ok := tt.requestBody.(string); ok {
@@ -266,13 +257,11 @@ func TestBalanceHandler_WithdrawForOrder(t *testing.T) {
 				}
 			}
 
-			// Выполнение запроса
 			req := httptest.NewRequest(tt.method, "/api/user/balance/withdraw", body)
 			w := httptest.NewRecorder()
 
 			bh.WithdrawForOrder(w, req)
 
-			// Проверка результата
 			assert.Equal(t, tt.expectedStatus, w.Code)
 		})
 	}
@@ -285,7 +274,7 @@ func TestBalanceHandler_GetUserWithdrawals(t *testing.T) {
 		fmt.Println("Ошибка парсинга:", err)
 		return
 	}
-	// Тестовые данные
+
 	mockWithdrawals := []model.GetUserWithdrawalsResponseModel{
 		{
 			Order:       "2377225624",
@@ -314,9 +303,9 @@ func TestBalanceHandler_GetUserWithdrawals(t *testing.T) {
 		},
 		{
 			name:   "Error 405 Method Not Allowed",
-			method: http.MethodPost, // Отправляем POST вместо GET
+			method: http.MethodPost,
 			mockSetup: func(m *MockBalanceService) {
-				m.GetUserWithdrawalsFunc = nil // Не должен вызываться
+				m.GetUserWithdrawalsFunc = nil
 			},
 			expectedStatus: http.StatusMethodNotAllowed,
 		},
@@ -354,7 +343,6 @@ func TestBalanceHandler_GetUserWithdrawals(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup
 			mockService := &MockBalanceService{}
 			tt.mockSetup(mockService)
 			bh := NewBalanceHandler(logger, mockService, nil)
@@ -362,13 +350,10 @@ func TestBalanceHandler_GetUserWithdrawals(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/api/user/withdrawals", nil)
 			w := httptest.NewRecorder()
 
-			// Execute
 			bh.GetUserWithdrawals(w, req)
 
-			// Assert Status
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
-			// Assert Headers & Body on Success
 			if tt.expectedStatus == http.StatusOK {
 				assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 				assert.Equal(t, strconv.Itoa(w.Body.Len()), w.Header().Get("Content-Length"))
