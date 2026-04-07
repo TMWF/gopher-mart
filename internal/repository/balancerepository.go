@@ -7,6 +7,7 @@ import (
 	"github.com/TMWF/gopher-mart/internal/logger"
 	"github.com/TMWF/gopher-mart/internal/model"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -212,23 +213,37 @@ func (br *balanceRepository) GetUserWithdrawals(ctx context.Context, userID uuid
 		return nil, err
 	}
 
-	defer rows.Close()
+	seq := scanRows(rows, func(rows pgx.Rows) (model.GetUserWithdrawalsResponseModel, error) {
+		var responseModel model.GetUserWithdrawalsResponseModel
+		err := rows.Scan(&responseModel.Order, &responseModel.Sum, &responseModel.ProcessedAt)
+		return responseModel, err
+	})
+
+	// defer rows.Close()
 
 	result := make([]model.GetUserWithdrawalsResponseModel, 0)
 
-	for rows.Next() {
-		var responseModel model.GetUserWithdrawalsResponseModel
-
-		if err := rows.Scan(&responseModel.Order, &responseModel.Sum, &responseModel.ProcessedAt); err != nil {
+	for res, err := range seq {
+		if err != nil {
 			return nil, err
 		}
 
-		result = append(result, responseModel)
+		result = append(result, res)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
+	// for rows.Next() {
+	// 	var responseModel model.GetUserWithdrawalsResponseModel
+
+	// 	if err := rows.Scan(&responseModel.Order, &responseModel.Sum, &responseModel.ProcessedAt); err != nil {
+	// 		return nil, err
+	// 	}
+
+	// 	result = append(result, responseModel)
+	// }
+
+	// if err := rows.Err(); err != nil {
+	// 	return nil, err
+	// }
 
 	return result, nil
 }

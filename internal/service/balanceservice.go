@@ -91,10 +91,10 @@ func (bs *balanceService) GetBalanceForUser(ctx context.Context) (*model.GetBala
 		return nil, ErrUserNotAuthenticated
 	}
 
-	context, cancel := context.WithTimeout(ctx, 5*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	response, err := bs.repository.GetBalanceForUser(context, userID)
+	response, err := bs.repository.GetBalanceForUser(timeoutCtx, userID)
 	if err != nil {
 		log.Warn("error occured while trying to retrieve user balance from database")
 		return nil, err
@@ -121,9 +121,9 @@ func (bs *balanceService) WithdrawForUserOrder(ctx context.Context, req *model.W
 		return ErrUserNotAuthenticated
 	}
 
-	context, cancel := context.WithTimeout(ctx, 5*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	return bs.repository.WithdrawForUserOrder(context, userID, req)
+	return bs.repository.WithdrawForUserOrder(timeoutCtx, userID, req)
 }
 
 // Implementation of GetUserWithdrawals method of BalanceService method.
@@ -151,10 +151,10 @@ func (bs *balanceService) GetUserWithdrawals(ctx context.Context) ([]model.GetUs
 		return nil, ErrUserNotAuthenticated
 	}
 
-	context, cancel := context.WithTimeout(ctx, 5*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	response, err := bs.repository.GetUserWithdrawals(context, userID)
+	response, err := bs.repository.GetUserWithdrawals(timeoutCtx, userID)
 	if err != nil {
 		return nil, err
 	}
