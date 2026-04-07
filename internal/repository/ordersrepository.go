@@ -8,6 +8,7 @@ import (
 	"github.com/TMWF/gopher-mart/internal/logger"
 	"github.com/TMWF/gopher-mart/internal/model"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -245,16 +246,23 @@ func (or *ordersRepository) FetchUnprocessedOrders(ctx context.Context, batchSiz
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+
+	seq := scanRows(rows, func(rows pgx.Rows) (model.OrderModel, error) {
+		var o model.OrderModel
+		err := rows.Scan(&o.ID, &o.Num, &o.UserID, &o.Status)
+		return o, err
+	})
 
 	var orders []model.OrderModel
-	for rows.Next() {
-		var o model.OrderModel
-		if err := rows.Scan(&o.ID, &o.Num, &o.UserID, &o.Status); err != nil {
+
+	for res, err := range seq {
+		if err != nil {
 			return nil, err
 		}
-		orders = append(orders, o)
+
+		orders = append(orders, res)
 	}
+
 	return orders, nil
 }
 

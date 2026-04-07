@@ -169,7 +169,6 @@ func (br *balanceRepository) WithdrawForUserOrder(ctx context.Context, userId uu
 		return err
 	}
 
-	// balanceAfterWithDrawal := userBalance - req.Sum
 	updateUserBalanceQuery := `UPDATE balances
 	SET current_balance = current_balance - $1
 	WHERE user_id = $2`
@@ -219,8 +218,6 @@ func (br *balanceRepository) GetUserWithdrawals(ctx context.Context, userID uuid
 		return responseModel, err
 	})
 
-	// defer rows.Close()
-
 	result := make([]model.GetUserWithdrawalsResponseModel, 0)
 
 	for res, err := range seq {
@@ -230,20 +227,6 @@ func (br *balanceRepository) GetUserWithdrawals(ctx context.Context, userID uuid
 
 		result = append(result, res)
 	}
-
-	// for rows.Next() {
-	// 	var responseModel model.GetUserWithdrawalsResponseModel
-
-	// 	if err := rows.Scan(&responseModel.Order, &responseModel.Sum, &responseModel.ProcessedAt); err != nil {
-	// 		return nil, err
-	// 	}
-
-	// 	result = append(result, responseModel)
-	// }
-
-	// if err := rows.Err(); err != nil {
-	// 	return nil, err
-	// }
 
 	return result, nil
 }
