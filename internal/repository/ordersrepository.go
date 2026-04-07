@@ -154,23 +154,20 @@ func (or *ordersRepository) GetUserOrders(ctx context.Context, userID uuid.UUID)
 		return nil, err
 	}
 
-	defer rows.Close()
+	seq := scanRows(rows, func(rows pgx.Rows) (model.GetUserOrdersResponseModel, error) {
+		var responseModel model.GetUserOrdersResponseModel
+		err := rows.Scan(&responseModel.Number, &responseModel.Status, &responseModel.Accrual, &responseModel.UploadedAt)
+		return responseModel, err
+	})
 
 	result := make([]model.GetUserOrdersResponseModel, 0)
 
-	for rows.Next() {
-		var responseModel model.GetUserOrdersResponseModel
-
-		err := rows.Scan(&responseModel.Number, &responseModel.Status, &responseModel.Accrual, &responseModel.UploadedAt)
+	for v, err := range seq {
 		if err != nil {
 			return nil, err
 		}
 
-		result = append(result, responseModel)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
+		result = append(result, v)
 	}
 
 	return result, nil
